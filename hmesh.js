@@ -613,44 +613,39 @@ class HedgeMesh extends PolyMesh {
         return mesh;
     }
 
-//Sets up all the nodes
-    //First 4 loop initializes all nodes
-    //second 4 loop attempts to find all neighbor nodes and then adds to the array
-    getNodes(){
-        let nodes = []
+    /**
+     * 
+     * @returns 
+     */
+    getDualGraph(){
+        let nodes = [];
         for (let i = 0; i < this.faces.length; i++){
-            let current = this.faces[i]
-            let center = current.getCentroid()
-            let idk = new Node(i,center)
-            this.faces[i].centroid = idk
+            let current = this.faces[i];
+            let center = current.getCentroid();
+            let nodei = new Node(i,center);
+            this.faces[i].centroid = nodei;
+            nodes.push(nodei);
         }
+        let edgeSet = new Set();
+        let edges = [];
 
-        let attached = []
         for (let i = 0; i < this.faces.length; i++){
-            attached = this.faces[i].getAdjacentFaces();
-            for(let j = 0; j < 3; j++){
-                if(this.faces[i].centroid.neighbors.length < 3){
-                    this.faces[i].centroid.neighbors.push(attached[j].centroid)
+            let nodei = this.faces[i].centroid;
+            let attached = this.faces[i].getAdjacentFaces();
+            for(let k = 0; k < attached.length; k++) {
+                let nodej = attached[k].centroid;
+                let j = nodej.index;
+                const s = Math.min(i, j) + "_" + Math.max(i, j);
+                if (!edgeSet.has(s)) {
+                    edgeSet.add(s);
+                    nodei.neighbors.push(nodej);
+                    nodej.neighbors.push(nodei);
+                    const edge = new Edge(nodei, nodej);
+                    edges.push(edge);
                 }
             }
-            nodes.push(this.faces[i].centroid) 
         }
-
-        return nodes
-    }
-
-    //Takes in the array of nodes and tries to set up edges using the neighbor data of each node
-    //doesn't work, probably a combination of the second 4 loop from previous method
-    getNodeEdges(nodes){
-        let edges = []
-        for(let i = 0; i < nodes.length; i++){
-            let p1 = nodes[i]
-            for(let j = 0; j < 3; j++){
-                let edge = new Edge(p1, p1.neighbors[j])
-                edges.push(edge)
-            }
-        }
-        return edges
+        return {"nodes":nodes, "edges":edges};
     }
 
 }
