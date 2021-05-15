@@ -49,6 +49,15 @@
         }
         reader.readAsText(meshInput.files[0]);
     });
+
+    // Load homer by default
+    $.get("ggslac/meshes/homer.off", function(result) {
+        let lines = result.split("\n");
+        canvas.mesh.loadFileFromLines(lines);
+        canvas.centerCamera();
+        requestAnimationFrame(canvas.repaint.bind(canvas));
+    });
+
 </script>
 
 </body>
