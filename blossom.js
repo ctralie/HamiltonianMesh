@@ -91,7 +91,10 @@ function differenceEdges(iterable1, iterable2) {
 
 function contractBlossom(graph, blossom) {
     let ret = graphlib.json.read(graphlib.json.write(graph));
-    let keptNode = blossom.nodes()[0];
+    let keptNode = "blossomContractNode";
+    for (let n of blossom.nodes())
+        keptNode += n;
+
     ret.setNode(keptNode, "contractNode");
     for (let edge of ret.edges()) {
         let v = edge.v;
@@ -126,20 +129,12 @@ function contractBlossom(graph, blossom) {
 }
 
 function liftPath(graph, path, blossom, contractNode, rootNode) {
-    console.log(blossom);
-    console.log(path);
-    console.log(rootNode);
     let contractNeighbors = [...path.neighbors(contractNode)];
     let neighbor1 = contractNeighbors[0], neighbor2 = undefined;
     let isEndpoint = contractNeighbors.length == 1;
-    if (!isEndpoint) {
+    if (!isEndpoint)
         neighbor2 = contractNeighbors[1];
-        path.removeEdge({v: neighbor2, w: contractNode});
-    }
-
-    path.removeEdge({v: neighbor1, w: contractNode});
-    path.removeNode(contractNode);
-
+        
     for (let node of graph.neighbors(neighbor1)) {
         if (blossom.hasNode(node)) {
             blossomPathNode1 = node;
@@ -154,20 +149,42 @@ function liftPath(graph, path, blossom, contractNode, rootNode) {
                 break;
             }
         }
+
+        path.removeEdge({v: neighbor1, w: contractNode});
+        path.removeEdge({v: neighbor2, w: contractNode});
+        path.removeNode(contractNode);
+        
         let bfsResult = bfs(blossom, blossomPathNode1, blossomPathNode2);
-        path.setNode(bfsResult.node, graph.node(bfsResult.node));
-        let lastNode = bfsResult.node;
-        while (bfsResult.parent != undefined) {
-            bfsResult = bfsResult.parent;
+        if (bfsResult.dist % 2 == 0) {
             path.setNode(bfsResult.node, graph.node(bfsResult.node));
-            path.setEdge(bfsResult.node, lastNode, "liftedBlossomEdge");
-            lastNode = bfsResult.node;
+            let lastNode = bfsResult.node;
+            while (bfsResult.parent != undefined) {
+                bfsResult = bfsResult.parent;
+                path.setNode(bfsResult.node, graph.node(bfsResult.node));
+                path.setEdge(bfsResult.node, lastNode, "liftedBlossomEdge");
+                lastNode = bfsResult.node;
+            }
+        }
+        else {
+            for (let e of blossom.edges()) {
+                if ((e.v != blossomPathNode1 || e.w != blossomPathNode2) && (e.v != blossomPathNode2 || e.w != blossomPathNode1)) {
+                    if (!path.hasNode(e.v))
+                        path.setNode(e.v, blossom.node(e.v));
+                    if (!path.hasNode(e.w))
+                        path.setNode(e.w, blossom.node(e.w));
+    
+                    path.setEdge(e.v, e.w, "liftedBlossomEdge");
+                }
+            }
         }
 
         path.setEdge(neighbor1, blossomPathNode1, "liftedBlossomStem");
         path.setEdge(neighbor2, blossomPathNode2, "liftedBlossomStem");
     }
     else {
+        path.removeEdge({v: neighbor1, w: contractNode});
+        path.removeNode(contractNode);
+
         for (let e of blossom.edges()) {
             if ((e.v != rootNode || e.w != blossomPathNode1) && (e.v != blossomPathNode1 || e.w != rootNode)) {
                 if (!path.hasNode(e.v))
@@ -183,7 +200,7 @@ function liftPath(graph, path, blossom, contractNode, rootNode) {
     }
 }
 
-function augmentingPath(graph, matching) {
+function augmentingPath(graph, matching, start = undefined) {
     let unmatched = new Set(graph.nodes());
     for (let n of matching.nodes())
         unmatched.delete(n);
@@ -204,16 +221,18 @@ function augmentingPath(graph, matching) {
 
     let uf = new UnionFind(graph.nodeCount());
     let unmarkedEdges = differenceEdges(graph.edges(), matching.edges());
-    unmatched = unmatched.length > 0 ? [unmatched[0]] : [];
+    if (start)
+        unmatched = [start];
+    else
+        unmatched = unmatched.length > 0 ? [unmatched[0]] : [];
+
     while (unmatched.length != 0) {
         let node = unmatched[0];
         let id = vertToUnionIndex[node];
         if (id != -1 && uf.distance(id) % 2 == 0) {
-            console.log(node);
             for (let j = 0; j < unmarkedEdges.length; ++j) {
                 let edge = unmarkedEdges[j];
                 if (edge.v == node || edge.w == node) {
-                    console.log(edge);
                     let otherNode = edge.v == node ? edge.w : edge.v;
                     let otherId = vertToUnionIndex[otherNode];
                     if (otherId == -1) {
@@ -247,15 +266,30 @@ function augmentingPath(graph, matching) {
                         }
                         else {
                             let blossom = new graphlib.Graph({directed: false});
-                            let bPath = uf.getPath(id).reverse().concat(uf.getPath(otherId));
-                            let bSet = new Set();
-                            for (let i = 0; i < bPath.length; ++i) {
-                                if (bSet.has(bPath[i]))
-                                    bPath.splice(i--, 1);
-                                else
-                                    bSet.add(bPath[i]);
+                            let bPath1 = uf.getPath(id);
+                            let bPath2 = uf.getPath(otherId);
+                            let bSet = new Set(bPath1);
+                            let first = true;
+                            let toRemove = new Set();
+                            for (let i = 0; i < bPath2.length; ++i) {
+                                if (bSet.has(bPath2[i])) {
+                                    if (first)
+                                        first = false;
+                                    else
+                                        toRemove.add(bPath2[i]);
+                                }
                             }
                             
+                            let bPath = bPath1.reverse().concat(bPath2);
+                            let rootPath = [];
+                            for (let i = 0; i < bPath.length; ++i) {
+                                if (toRemove.has(bPath[i])) {
+                                    let val = bPath.splice(i--, 1)[0];
+                                    if (i < bPath.length / 2)
+                                        rootPath.push(unionIndexToVert[val]);
+                                }
+                            }
+
                             for (let i = 0; i < bPath.length; ++i) {
                                 var name = unionIndexToVert[bPath[i]];
                                 blossom.setNode(name, "blossomNode" + name);
@@ -266,7 +300,24 @@ function augmentingPath(graph, matching) {
                             let contractedGraph = contractBlossom(graph, blossom);
                             let contractedMatching = contractBlossom(matching, blossom);
                             contractedMatching.graph.removeNode(contractedMatching.contracted);
-                            let path = augmentingPath(contractedGraph.graph, contractedMatching.graph);
+                            let path = augmentingPath(contractedGraph.graph, contractedMatching.graph, contractedGraph.contracted);
+                            if (rootPath.length > 0) {
+                                let lastNode = rootPath[0];
+                                if (!path.hasNode(lastNode))
+                                    path.setNode(lastNode, graph.node(lastNode));
+
+                                for (let i = 1; i < rootPath.length; ++i) {
+                                    let n = rootPath[i];
+                                    if (!path.hasNode(n))
+                                        path.setNode(n, graph.node(n));
+
+                                    path.setEdge(lastNode, n, graph.edge(lastNode, n));
+                                    lastNode = n;
+                                }
+
+                                path.setEdge(lastNode, contractedGraph.contracted, "rootEdgeToBlossom");
+                            }
+
                             if (path.hasNode(contractedGraph.contracted))
                                 liftPath(graph, path, blossom, contractedGraph.contracted, unionIndexToVert[uf.root(vertToUnionIndex[node])]);
 
@@ -286,20 +337,12 @@ function augmentingPath(graph, matching) {
 }
 
 function augmentMatching(matching, path) {
-    let ret = new graphlib.Graph({directed: false});
-    for (let n of matching.nodes())
-        ret.setNode(n, matching.node(n));
-
-    for (let n of path.nodes())
-        ret.setNode(n, path.node(n));
-    
-    for (let e of matching.edges()) {
-        if (!path.hasEdge(e))
-            ret.setEdge(e.v, e.w, matching.edge(e));
-    }
+    let ret = graphlib.json.read(graphlib.json.write(matching));
     for (let e of path.edges()) {
-        if (!matching.hasEdge(e))
-            ret.setEdge(e.v, e.w, path.edge(e));
+        if (ret.hasEdge(e))
+            ret.removeEdge(e);
+        else
+            ret.setEdge(e.v, e.w, "augmentedEdge");
     }
 
     return ret;
