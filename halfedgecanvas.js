@@ -88,7 +88,9 @@ class HalfEdgeCanvas extends BaseCanvas {
         let path = this.mesh.getNodes()
         let edges = this.mesh.getNodeEdges(path)
         for(let i = 0; i < path.length; i++){
-            drawer.drawPoint(path[i].center, [1,0,0])
+            drawer.drawPoint(path[i].center, [1,0,0]);
+        }
+        for (let i = 0; i < edges.length; i++) {
             drawer.drawLine(edges[i].p1.center, edges[i].p2.center, [0,1,0])
         }
         this.repaint();
