@@ -73,11 +73,8 @@ class HalfEdgeCanvas extends BaseCanvas {
         creationMenu.add(this, 'doLoopSubdivision');
         
         let dualMenu = gui.addFolder("Dual Graph");
-        this.drawDualGraph = function() {
-            copyInMesh(canvas.mesh.getDualGraph())
-            simpleRepaint();
-        }
         dualMenu.add(this, 'getDualGraph');
+        dualMenu.add(this, 'getDualMatching');
 
         gui.add(this.mesh, 'saveOffFile').onChange(simpleRepaint);
         simpleRepaint();
@@ -85,6 +82,7 @@ class HalfEdgeCanvas extends BaseCanvas {
 
     getDualGraph(){
         let drawer = this.drawer;
+        drawer.reset();
         const res = this.mesh.getDualGraph();
         const nodes = res.nodes;
         const edges = res.edges;
@@ -94,6 +92,12 @@ class HalfEdgeCanvas extends BaseCanvas {
         for (let i = 0; i < edges.length; i++) {
             drawer.drawLine(edges[i].p1.center, edges[i].p2.center, [0,1,0])
         }
+        this.repaint();
+    }
+
+    getDualMatching(){
+        this.getDualGraph();
+        let res = this.mesh.getDualMatching();
         this.repaint();
     }
 

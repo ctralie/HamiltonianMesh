@@ -1,4 +1,4 @@
-graphlib = require("./graphlib.min.js");
+//graphlib = require("./graphlib.min.js");
 
 class UnionFind {
     constructor(N) {
@@ -408,6 +408,7 @@ function makePentagonAndLine(graph) {
     graph.setEdge("7", "9", "edge9");
 }
 
-var graph = new graphlib.Graph({directed: false});
+/*var graph = new graphlib.Graph({directed: false});
 makeTrianglesAndSquares(graph);
-console.log(blossom(graph));
+let res = blossom(graph);
+console.log(res.edges());*/

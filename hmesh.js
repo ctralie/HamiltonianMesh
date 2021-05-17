@@ -614,8 +614,8 @@ class HedgeMesh extends PolyMesh {
     }
 
     /**
-     * 
-     * @returns 
+     * Compute an undirected dual graph of the mesh
+     * @returns {'nodes': List of node objects, 'edges':List of edge objects}
      */
     getDualGraph(){
         let nodes = [];
@@ -646,6 +646,25 @@ class HedgeMesh extends PolyMesh {
             }
         }
         return {"nodes":nodes, "edges":edges};
+    }
+
+    /**
+     * Perform a maximum matching on the dual graph
+     */
+    getDualMatching() {
+        let res = this.getDualGraph();
+        let graph = new graphlib.Graph({directed: false});
+        const nodes = res.nodes;
+        const edges = res.edges;
+        for (let i = 0; i < nodes.length; i++) {
+            graph.setNode(nodes[i].index, "node" + nodes[i].index);
+        }
+        for (let i = 0; i < edges.length; i++) {
+            const i1 = edges[i].p1.index;
+            const i2 = edges[i].p2.index;
+            graph.setEdge(i1, i2, "edge" + i);
+        }
+        const matching = blossom(graph);
     }
 
 }
