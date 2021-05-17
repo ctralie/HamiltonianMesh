@@ -655,7 +655,7 @@ class HedgeMesh extends PolyMesh {
         let res = this.getDualGraph();
         let graph = new graphlib.Graph({directed: false});
         const nodes = res.nodes;
-        const edges = res.edges;
+        let edges = res.edges;
         for (let i = 0; i < nodes.length; i++) {
             graph.setNode(nodes[i].index, "node" + nodes[i].index);
         }
@@ -665,6 +665,13 @@ class HedgeMesh extends PolyMesh {
             graph.setEdge(i1, i2, "edge" + i);
         }
         const matching = blossom(graph);
+        edges = matching.edges();
+        for (let i = 0; i < edges.length; i++) {
+            const v = parseInt(edges[i].v);
+            const w = parseInt(edges[i].w);
+            edges[i] = new Edge(nodes[v], nodes[w]);
+        }
+        return {"nodes":nodes, "edges":edges};
     }
 
 }

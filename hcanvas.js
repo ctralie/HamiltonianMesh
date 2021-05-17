@@ -80,12 +80,11 @@ class HalfEdgeCanvas extends BaseCanvas {
         simpleRepaint();
     }
 
-    getDualGraph(){
-        let drawer = this.drawer;
+    drawGraph(graph) {
+        const drawer = this.drawer;
         drawer.reset();
-        const res = this.mesh.getDualGraph();
-        const nodes = res.nodes;
-        const edges = res.edges;
+        const nodes = graph.nodes;
+        const edges = graph.edges;
         for(let i = 0; i < nodes.length; i++){
             drawer.drawPoint(nodes[i].center, [1,0,0]);
         }
@@ -95,10 +94,12 @@ class HalfEdgeCanvas extends BaseCanvas {
         this.repaint();
     }
 
+    getDualGraph(){
+        this.drawGraph(this.mesh.getDualGraph());
+    }
+
     getDualMatching(){
-        this.getDualGraph();
-        let res = this.mesh.getDualMatching();
-        this.repaint();
+        this.drawGraph(this.mesh.getDualMatching());
     }
 
     /**

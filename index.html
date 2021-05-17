@@ -53,7 +53,7 @@
     });
 
     // Load homer by default
-    $.get("ggslac/meshes/homer.off", function(result) {
+    $.get("ggslac/meshes/hand-simple.off", function(result) {
         let lines = result.split("\n");
         canvas.mesh.loadFileFromLines(lines);
         canvas.centerCamera();
