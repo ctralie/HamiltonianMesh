@@ -85,10 +85,11 @@ class HalfEdgeCanvas extends BaseCanvas {
 
     getDualGraph(){
         let drawer = this.drawer;
-        let path = this.mesh.getNodes()
-        let edges = this.mesh.getNodeEdges(path)
-        for(let i = 0; i < path.length; i++){
-            drawer.drawPoint(path[i].center, [1,0,0]);
+        const res = this.mesh.getDualGraph();
+        const nodes = res.nodes;
+        const edges = res.edges;
+        for(let i = 0; i < nodes.length; i++){
+            drawer.drawPoint(nodes[i].center, [1,0,0]);
         }
         for (let i = 0; i < edges.length; i++) {
             drawer.drawLine(edges[i].p1.center, edges[i].p2.center, [0,1,0])
