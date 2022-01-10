@@ -653,25 +653,28 @@ class HedgeMesh extends PolyMesh {
      */
     getDualMatching() {
         let res = this.getDualGraph();
-        let graph = new graphlib.Graph({directed: false});
-        const nodes = res.nodes;
-        let edges = res.edges;
-        for (let i = 0; i < nodes.length; i++) {
-            graph.setNode(nodes[i].index, "node" + nodes[i].index);
+        let edges = new Array();
+        for (let e of res.edges) {
+            edges.push(e.p1.index);
+            edges.push(e.p2.index);
         }
-        for (let i = 0; i < edges.length; i++) {
-            const i1 = edges[i].p1.index;
-            const i2 = edges[i].p2.index;
-            graph.setEdge(i1, i2, "edge" + i);
+
+        const matching = Module["blossom"](edges);
+        try {
+            assert(matching.size() % 2 == 0, "Matching has an incomplete edge");
+            edges.length = 0;
+            for (let i = 0; i < matching.size(); i += 2) {
+                const v = matching.get(i);
+                const w = matching.get(i + 1);
+                edges.push(new Edge(res.nodes[v], res.nodes[w]));
+            }
+
         }
-        const matching = blossom(graph);
-        edges = matching.edges();
-        for (let i = 0; i < edges.length; i++) {
-            const v = parseInt(edges[i].v);
-            const w = parseInt(edges[i].w);
-            edges[i] = new Edge(nodes[v], nodes[w]);
+        finally {
+            matching.delete();
         }
-        return {"nodes":nodes, "edges":edges};
+
+        return {"nodes": res.nodes, "edges": edges};
     }
 
 }
