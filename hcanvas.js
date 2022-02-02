@@ -75,6 +75,7 @@ class HalfEdgeCanvas extends BaseCanvas {
         let dualMenu = gui.addFolder("Dual Graph");
         dualMenu.add(this, 'getDualGraph');
         dualMenu.add(this, 'getDualMatching');
+        dualMenu.add(this, 'getHamiltonianCycle');
 
         gui.add(this.mesh, 'saveOffFile').onChange(simpleRepaint);
         simpleRepaint();
@@ -100,6 +101,10 @@ class HalfEdgeCanvas extends BaseCanvas {
 
     getDualMatching(){
         this.drawGraph(this.mesh.getDualMatching());
+    }
+
+    getHamiltonianCycle() {
+        this.drawGraph(this.mesh.getHamiltonianCycle());
     }
 
     /**

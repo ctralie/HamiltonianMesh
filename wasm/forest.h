@@ -3,6 +3,7 @@
 
 #include <iterator>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 template<typename T>
@@ -91,6 +92,17 @@ class forest
         bool same_tree(const T& v1, const T& v2) const
         {
             return root(v1) == root(v2);
+        }
+
+        std::size_t num_trees() const
+        {
+            std::unordered_set<std::size_t> unique;
+            for (std::size_t i = 0; i < parents.size(); ++i)
+            {
+                unique.insert(rootInternal(i));
+            }
+
+            return unique.size();
         }
 
         void add_node(const T& node)

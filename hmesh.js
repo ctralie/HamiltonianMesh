@@ -677,6 +677,32 @@ class HedgeMesh extends PolyMesh {
         return {"nodes": res.nodes, "edges": edges};
     }
 
+    getHamiltonianCycle() {
+        let res = this.getDualGraph();
+        let edges = new Array();
+        for (let e of res.edges) {
+            edges.push(e.p1.index);
+            edges.push(e.p2.index);
+        }
+
+        const cycle = Module["hamiltonianCycle"](edges);
+        try {
+            assert(cycle.size() % 2 == 0, "Cycle has an incomplete edge");
+            edges.length = 0;
+            for (let i = 0; i < cycle.size(); i += 2) {
+                const v = cycle.get(i);
+                const w = cycle.get(i + 1);
+                edges.push(new Edge(res.nodes[v], res.nodes[w]));
+            }
+
+        }
+        finally {
+            cycle.delete();
+        }
+
+        return {"nodes": res.nodes, "edges": edges};
+    }
+
 }
 
 class Node {

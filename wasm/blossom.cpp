@@ -289,20 +289,8 @@ void augmentMatching(graph_t& matching, const graph_t& path)
     matching.add_edges_from(pathWithoutMatching);
 }
 
-#ifdef __EMSCRIPTEN__
-std::vector<node_t> blossom(const emscripten::val& edgeData)
+graph_t doBlossom(const graph_t& edges)
 {
-    auto edgeNums = emscripten::convertJSArrayToNumberVector<node_t>(edgeData);
-#else
-std::vector<node_t> blossom(const std::vector<node_t>& edgeNums)
-#endif
-    assert(edgeNums.size() % 2 == 0);
-    graph_t edges;
-    for (std::size_t i = 0; i < edgeNums.size(); i += 2)
-    {
-        edges.add_edge(edgeNums[i], edgeNums[i + 1]);
-    }
-    
     graph_t matching;
     auto path = augmentingPath(edges, matching);
     while (!path.empty())
@@ -310,8 +298,31 @@ std::vector<node_t> blossom(const std::vector<node_t>& edgeNums)
         augmentMatching(matching, path);
         path = augmentingPath(edges, matching);
     }
-    
-    edgeNums.clear();
+
+    return matching;
+}
+
+#ifdef __EMSCRIPTEN__
+graph_t inputValuesToGraph(const emscripten::val& edgeData)
+{
+    auto edgeNums = emscripten::convertJSArrayToNumberVector<node_t>(edgeData);
+#else
+graph_t inputValuesToGraph(const std::vector<node_t>& edgeNums)
+{
+#endif
+    assert(edgeNums.size() % 2 == 0);
+    graph_t edges;
+    for (std::size_t i = 0; i < edgeNums.size(); i += 2)
+    {
+        edges.add_edge(edgeNums[i], edgeNums[i + 1]);
+    }
+
+    return edges;
+}
+
+std::vector<node_t> graphToOutputValues(const graph_t& matching)
+{
+    std::vector<node_t> edgeNums;
     for (const auto& [v1, v2] : matching.edges())
     {
         edgeNums.push_back(v1);
@@ -322,10 +333,91 @@ std::vector<node_t> blossom(const std::vector<node_t>& edgeNums)
 }
 
 #ifdef __EMSCRIPTEN__
+std::vector<node_t> blossom(const emscripten::val& edgeData)
+#else
+std::vector<node_t> blossom(const std::vector<node_t>& edgeData)
+#endif
+{ 
+    auto matching = doBlossom(inputValuesToGraph(edgeData));
+    return graphToOutputValues(matching);
+}
+
+#ifdef __EMSCRIPTEN__
+std::vector<node_t> hamiltonianCycle(const emscripten::val& edgeData)
+#else
+std::vector<node_t> hamiltonianCycle(const std::vector<node_t>& edgeData)
+#endif
+{
+    auto dualGraph = inputValuesToGraph(edgeData);
+    auto matching = doBlossom(dualGraph);
+
+    dualGraph.remove_edges_from(matching);
+    forest_t cycles;
+    auto nodesPair = dualGraph.nodes();
+    std::unordered_set<node_t> remainingVerts(nodesPair.first, nodesPair.second);
+    while (!remainingVerts.empty())
+    {
+        node_t start = *remainingVerts.begin();
+        remainingVerts.erase(start);
+        cycles.add_node(start);
+        std::deque<node_t> queue;
+        queue.push_back(start);
+        while (!queue.empty())
+        {
+            node_t n = queue.front();
+            queue.pop_front();
+            for (const auto& v : dualGraph.edges_of_node(n))
+            {
+                cycles.set_edge(start, v);
+                if (remainingVerts.erase(v))
+                {
+                    queue.push_back(v);
+                }
+            }
+        }
+    }
+    
+    for (const auto& [v1, v2] : matching.edges())
+    {
+        if (!cycles.same_tree(v1, v2))
+        {
+            auto neighbors1 = dualGraph.edges_of_node(v1);
+            auto neighbors2 = dualGraph.edges_of_node(v2);
+            bool connected = false;
+            for (const auto& n : neighbors1)
+            {
+                for (const auto& m : matching.edges_of_node(n))
+                {
+                    if (neighbors2.contains(m))
+                    {
+                        cycles.set_edge(v1, cycles.root(v2));
+                        dualGraph.remove_edge(v1, n);
+                        dualGraph.remove_edge(v2, m);
+                        dualGraph.add_edge(v1, v2);
+                        dualGraph.add_edge(n, m);
+                        connected = true;
+                        break;
+                    }
+                }
+
+                if (connected)
+                {
+                    break;
+                }
+            }            
+        } 
+    }
+
+    std::cout << cycles.num_trees() << std::endl;
+    return graphToOutputValues(dualGraph);
+}
+
+#ifdef __EMSCRIPTEN__
 
 EMSCRIPTEN_BINDINGS(module)
 {
     emscripten::function("blossom", &blossom);
+    emscripten::function("hamiltonianCycle", &hamiltonianCycle);
     emscripten::register_vector<node_t>("vector<node_t>");
 }
 
