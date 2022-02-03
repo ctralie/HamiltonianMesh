@@ -343,9 +343,9 @@ std::vector<node_t> blossom(const std::vector<node_t>& edgeData)
 }
 
 #ifdef __EMSCRIPTEN__
-std::vector<node_t> hamiltonianCycle(const emscripten::val& edgeData)
+std::pair<std::vector<node_t>, std::vector<node_t>> hamiltonianCycle(const emscripten::val& edgeData)
 #else
-std::vector<node_t> hamiltonianCycle(const std::vector<node_t>& edgeData)
+std::pair<std::vector<node_t>, std::vector<node_t>> hamiltonianCycle(const std::vector<node_t>& edgeData)
 #endif
 {
     auto dualGraph = inputValuesToGraph(edgeData);
@@ -376,48 +376,60 @@ std::vector<node_t> hamiltonianCycle(const std::vector<node_t>& edgeData)
             }
         }
     }
-    
-    for (const auto& [v1, v2] : matching.edges())
+   
+    std::vector<node_t> subdivisions;
+    if (cycles.num_trees() != 1)
     {
-        if (!cycles.same_tree(v1, v2))
+        node_t nextNewNode = *std::max_element(nodesPair.first, nodesPair.second) + 1;
+        for (const auto& [v1, v2] : matching.edges())
         {
-            auto neighbors1 = dualGraph.edges_of_node(v1);
-            auto neighbors2 = dualGraph.edges_of_node(v2);
-            bool connected = false;
-            for (const auto& n : neighbors1)
+            if (!cycles.same_tree(v1, v2))
             {
-                for (const auto& m : matching.edges_of_node(n))
-                {
-                    if (neighbors2.contains(m))
-                    {
-                        cycles.set_edge(v1, cycles.root(v2));
-                        dualGraph.remove_edge(v1, n);
-                        dualGraph.remove_edge(v2, m);
-                        dualGraph.add_edge(v1, v2);
-                        dualGraph.add_edge(n, m);
-                        connected = true;
-                        break;
-                    }
-                }
+                auto neighbors1Set = dualGraph.edges_of_node(v1);
+                auto neighbors2Set = dualGraph.edges_of_node(v2);
+                std::vector<node_t> neighbors1(neighbors1Set.cbegin(), neighbors1Set.cend());
+                std::vector<node_t> neighbors2(neighbors2Set.cbegin(), neighbors2Set.cend());
+                assert(neighbors1.size() == 2);
+                assert(neighbors2.size() == 2);
 
-                if (connected)
-                {
-                    break;
-                }
-            }            
-        } 
+                node_t newNode1 = nextNewNode++;
+                node_t newNode2 = nextNewNode++;
+
+                cycles.set_edge(v1, cycles.root(v2));
+                cycles.set_edge(v1, newNode1);
+                cycles.set_edge(v2, newNode2);
+                dualGraph.remove_edge(v1, neighbors1[1]);
+                dualGraph.remove_edge(v2, neighbors2[1]);
+                dualGraph.add_edge(v1, v2);
+                dualGraph.add_edge(newNode1, neighbors1[1]);
+                dualGraph.add_edge(newNode2, neighbors2[1]);
+                dualGraph.add_edge(newNode1, newNode2);
+
+                subdivisions.push_back(v1);
+                subdivisions.push_back(newNode1);
+                subdivisions.push_back(v2);
+                subdivisions.push_back(newNode2);
+            } 
+        }
     }
 
-    std::cout << cycles.num_trees() << std::endl;
-    return graphToOutputValues(dualGraph);
+    return {graphToOutputValues(dualGraph), subdivisions};
 }
 
 #ifdef __EMSCRIPTEN__
+
+using hCycleRetType = std::invoke_result_t<decltype(hamiltonianCycle), const emscripten::val&>;
 
 EMSCRIPTEN_BINDINGS(module)
 {
     emscripten::function("blossom", &blossom);
     emscripten::function("hamiltonianCycle", &hamiltonianCycle);
+    
+    emscripten::value_object<hCycleRetType>("pair<vector<node_t>,vector<node_t>>")
+        .field("graph", &hCycleRetType::first)
+        .field("subdivisions", &hCycleRetType::second)
+    ;
+    
     emscripten::register_vector<node_t>("vector<node_t>");
 }
 

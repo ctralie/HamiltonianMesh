@@ -648,6 +648,16 @@ class HedgeMesh extends PolyMesh {
         return {"nodes":nodes, "edges":edges};
     }
 
+    redoNeighbors(nodes, edges) {
+        for (let i = 0; i < nodes.length; ++i)
+            nodes[i].neighbors.length = 0;
+
+        for (let e of edges) {
+            e.p1.neighbors.push(e.p2);
+            e.p2.neighbors.push(e.p1);
+        }
+    }
+
     /**
      * Perform a maximum matching on the dual graph
      */
@@ -674,6 +684,7 @@ class HedgeMesh extends PolyMesh {
             matching.delete();
         }
 
+        this.redoNeighbors(res.nodes, edges);
         return {"nodes": res.nodes, "edges": edges};
     }
 
@@ -685,21 +696,37 @@ class HedgeMesh extends PolyMesh {
             edges.push(e.p2.index);
         }
 
-        const cycle = Module["hamiltonianCycle"](edges);
+        const cycleAndSubDivs = Module["hamiltonianCycle"](edges);
+        let cycle = cycleAndSubDivs.graph;
+        let subdivisions = cycleAndSubDivs.subdivisions;
         try {
             assert(cycle.size() % 2 == 0, "Cycle has an incomplete edge");
             edges.length = 0;
             for (let i = 0; i < cycle.size(); i += 2) {
                 const v = cycle.get(i);
                 const w = cycle.get(i + 1);
+                if (!res.nodes[v])
+                {
+                    res.nodes.length = Math.max(v + 1, res.nodes.length);
+                    res.nodes[v] = new Node(v, [0, 0, 0]);
+                }
+
+                if (!res.nodes[w])
+                {
+                    res.nodes.length = Math.max(w + 1, res.nodes.length);
+                    res.nodes[w] = new Node(w, [0, 0, 0]);
+                }
+
                 edges.push(new Edge(res.nodes[v], res.nodes[w]));
             }
 
         }
         finally {
             cycle.delete();
+            subdivisions.delete();
         }
 
+        this.redoNeighbors(res.nodes, edges);
         return {"nodes": res.nodes, "edges": edges};
     }
 
