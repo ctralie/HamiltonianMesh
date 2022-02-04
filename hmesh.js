@@ -3,7 +3,7 @@
  */
 
 let vec3 = glMatrix.vec3;
-
+let mat3 = glMatrix.mat3;
 
 class HMeshEdge {
     /**
@@ -688,6 +688,35 @@ class HedgeMesh extends PolyMesh {
         return {"nodes": res.nodes, "edges": edges};
     }
 
+    shiftVertices(orig, sub, oppositeOrig, oppositeSub) {
+        let faceNormal = this.faces[orig.index].getNormal();
+        let edgeDir = vec3.normalize(vec3.create(), vec3.subtract(vec3.create(), oppositeOrig.center, orig.center));
+        let moveDir = vec3.cross(vec3.create(), faceNormal, edgeDir);
+        let move = vec3.scale(vec3.create(), moveDir, 0.05);
+
+        sub.center = vec3.clone(orig.center);
+        vec3.subtract(orig.center, orig.center, move);
+        vec3.add(sub.center, sub.center, move);
+
+        // test for crossing adjacent to subdivided edges 
+        // this is caused by a bad guess in the direction the verts moved
+        let testVert = orig.neighbors[0];
+        if (testVert == oppositeOrig)
+            testVert = orig.neighbors[1];
+
+        if (vec3.squaredDistance(testVert.center, orig.center) > vec3.squaredDistance(testVert.center, sub.center)) {
+            const temp = orig.center;
+            orig.center = sub.center;
+            sub.center = temp;
+        }
+    } 
+
+    segmentsCross(firstP1, firstP2, secondP1, secondP2) {
+        let p1 = vec3.fromValues((firstP1[0] + firstP2[0]) / 2, (firstP1[1] + firstP2[1]) / 2, (firstP1[2] + firstP2[2]) / 2);    
+        let p2 = vec3.fromValues((secondP1[0] + secondP2[0]) / 2, (secondP1[1] + secondP2[1]) / 2, (secondP1[2] + secondP2[2]) / 2);
+        return vec3.squaredDistance(p1, p2) < 0.001;
+    }
+
     getHamiltonianCycle() {
         let res = this.getDualGraph();
         let edges = new Array();
@@ -720,13 +749,38 @@ class HedgeMesh extends PolyMesh {
                 edges.push(new Edge(res.nodes[v], res.nodes[w]));
             }
 
+            this.redoNeighbors(res.nodes, edges);
+            for (let i = 0; i < subdivisions.size(); i += 4) {
+                let orig1 = res.nodes[subdivisions.get(i)];
+                let sub1 = res.nodes[subdivisions.get(i + 1)];
+                let orig2 = res.nodes[subdivisions.get(i + 2)];
+                let sub2 = res.nodes[subdivisions.get(i + 3)];
+
+                this.shiftVertices(orig1, sub1, orig2, sub2);
+                this.shiftVertices(orig2, sub2, orig1, sub1);
+
+                if (this.segmentsCross(orig1.center, orig2.center, sub1.center, sub2.center)) {
+                    orig1.neighbors.splice(orig1.neighbors.indexOf(orig2), 1);
+                    orig2.neighbors.splice(orig2.neighbors.indexOf(orig1), 1);
+                    sub1.neighbors.splice(sub1.neighbors.indexOf(sub2), 1);
+                    sub2.neighbors.splice(sub2.neighbors.indexOf(sub1), 1);
+
+                    edges = edges.filter(e => !e.isEdge(orig1, orig2) && !e.isEdge(sub1, sub2));
+
+                    orig1.neighbors.push(sub2);
+                    orig2.neighbors.push(sub1);
+                    sub1.neighbors.push(orig2);
+                    sub2.neighbors.push(orig1);
+                    edges.push(new Edge(orig1, sub2));
+                    edges.push(new Edge(orig2, sub1));
+                }
+            }
         }
         finally {
             cycle.delete();
             subdivisions.delete();
         }
-
-        this.redoNeighbors(res.nodes, edges);
+ 
         return {"nodes": res.nodes, "edges": edges};
     }
 
@@ -744,5 +798,9 @@ class Edge {
     constructor(p1, p2){
         this.p1 = p1
         this.p2 = p2
+    }
+
+    isEdge(v1, v2) {
+        return (this.p1 == v1 && this.p2 == v2) || (this.p2 == v1 && this.p1 == v2);
     }
 }
